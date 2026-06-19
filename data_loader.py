@@ -28,6 +28,18 @@ HOME_CITY_MAP = {
     "Gujarat Titans": ["Ahmedabad", "Narendra Modi"],
     "Lucknow Super Giants": ["Lucknow", "Ekana"],
 }
+VENUE_CLEANING = {
+    "Wankhede Stadium, Mumbai": "Wankhede Stadium",
+    "MA Chidambaram Stadium, Chepauk": "MA Chidambaram Stadium",
+    "MA Chidambaram Stadium, Chepauk, Chennai": "MA Chidambaram Stadium",
+    "M Chinnaswamy Stadium": "M Chinnaswamy Stadium",
+    "Punjab Cricket Association Stadium, Mohali": "Punjab Cricket Association IS Bindra Stadium",
+    "Punjab Cricket Association IS Bindra Stadium, Mohali": "Punjab Cricket Association IS Bindra Stadium",
+    "Feroz Shah Kotla": "Arun Jaitley Stadium",
+    "Arun Jaitley Stadium, Delhi": "Arun Jaitley Stadium",
+    "Rajiv Gandhi International Stadium, Uppal": "Rajiv Gandhi International Stadium",
+    "Eden Gardens, Kolkata": "Eden Gardens",
+}
 
 BOWLER_WICKET_TYPES = [
     "caught", "bowled", "lbw", "stumped",
@@ -62,6 +74,10 @@ def load_matches():
     
     # Clean city names
     df["city"] = df["city"].replace({"Bangalore": "Bengaluru"})
+
+
+    #Venue Cleaning
+    df["venue"] = df["venue"].replace(VENUE_CLEANING)
     
     # Remove no-result matches for analysis
     # Keep them in a separate variable if needed
@@ -117,6 +133,7 @@ def load_deliveries():
     df["is_boundary"] = df["batsman_runs"].isin([4, 6]).astype(int)
     df["is_six"] = (df["batsman_runs"] == 6).astype(int)
     df["is_four"] = (df["batsman_runs"] == 4).astype(int)
+    df["bowler_runs"] = df["total_runs"] - df["extra_runs"].where(df["extras_type"].isin(["byes","legbyes"]), 0)
     
     return df
 
