@@ -612,8 +612,514 @@ with tab1:
             st.caption(f"Average 1st innings: **{first_innings.mean():.0f}** | "f"Average 2nd innings: **{second_innings.mean():.0f}**")
 
 
+            # TAB 4: VENUE INTELLIGENCE
+    
+    
+            # ============================================================
+
+    with tab4:
+        st.title("🏟️ Venue Intelligence")
+        st.markdown("*Select a stadium to explore its scoring patterns and records*")
+
+        all_venues = get_all_venues(matches)
+        selected_venue=st.selectbox("Select A Venue",all_venues,index=all_venues.index("Wankhede Stadium") if "Wankhede Stadium" in all_venues else 0)
+
+        venue_matches=matches[matches["venue"]==selected_venue].copy()
+        venue_match_ids=venue_matches["id"].tolist()
+        venue_deliveries=merged[merged["match_id"].isin(venue_match_ids)]
+        if len(venue_matches)<2:
+            st.warning(f"Limited data for {selected_venue} (only {len(venue_matches)} match)")
+        else:
+
+            #SECTION 1: STADIUM PROFILE
+            st.subheader(f"📋 {selected_venue} — Stadium Profile")   
+            standard_venue=venue_matches[venue_matches["method"].isna()|(venue_matches["method"]=="")]
+            standard_ids=standard_venue["id"].tolist()
+            stadium_innings = venue_deliveries[venue_deliveries["match_id"].isin(standard_ids)].groupby(["match_id", "inning"])["total_runs"].sum().unstack(fill_value=0)
+            
+            avg_first_innings = stadium_innings[1].mean() if 1 in stadium_innings.columns else 0
+            
+            winning_data = standard_venue[["id", "winner", "result"]].merge(stadium_innings, left_on="id", right_index=True)
+
+            winning_data["winning_score"] = np.where(winning_data["result"] == "runs",winning_data[1],winning_data[2])
+
+            avg_winning_score = winning_data["winning_score"].mean() if not winning_data.empty else 0
+            
+            c1,c2,c3=st.columns(3)
+
+            c1.metric("Matches Hosted",len(venue_matches))
+            c2.metric("Avg 1st Innings Score",f"{avg_first_innings:.0f}"if avg_first_innings > 0 else "N/A")
+            c3.metric("Avg Winning Score",f"{avg_winning_score:.0f}"if avg_winning_score > 0 else "N/A")
+
+            st.divider()
+
+            #SECTION 2:BATTING FIRST VS CHASING:
+
+            st.subheader("⚖️ Defending vs Chasing Equilibrium")
+
+            dls_toggle_venue=st.checkbox("Include Rain affected Matches",value= True,key="venue_dls")
+
+            analysis_venue=venue_matches if dls_toggle_venue else standard_venue
+
+            bat_first_wins=analysis_venue["batting_first_won"].sum()
+            chase_wins=len(analysis_venue)-bat_first_wins
+
+            fig,ax=plt.subplots(figsize=(5,4))
+            ax.pie([bat_first_wins,chase_wins],labels=["Batting First","Chasing"],colors=["steelblue","orange"],autopct="%1.0f%%",startangle=90,textprops={'fontsize':10})
 
 
+            ax.set_title(f"Win Rate at {selected_venue}",fontsize=11,wrap=True)
+            plt.tight_layout()
+            col1, col2 = st.columns([1,1])
+            with col1:
+                st.pyplot(fig)
+            plt.close()
+        
+            st.divider()
+
+            #SECTION 3: PHASE-WISE BREAKDOWN
+
+            st.subheader("📊 Phase-Wise Strategic Breakdown")
+            st.markdown("*How this venue plays across Powerplay, Middle, and Death overs*")
+
+           
+
+            venue_phase_stats = venue_deliveries.groupby("phase").apply(lambda x: pd.Series({"total_runs": x["total_runs"].sum(),"legal_balls": (~x["extras_type"].isin(["wides","noballs"])).sum() })).reset_index()
+            venue_phase_stats["run_rate"] = (venue_phase_stats["total_runs"] / venue_phase_stats["legal_balls"] * 6)
+
+            #Compare against tournament average
+
+            
+            overall_phase_stats = merged.groupby("phase").apply(lambda x: pd.Series({"total_runs": x["total_runs"].sum(),"legal_balls": (~x["extras_type"].isin(["wides","noballs"])).sum()})).reset_index()
+
+            overall_phase_stats["run_rate"] = (overall_phase_stats["total_runs"] / overall_phase_stats["legal_balls"] * 6)
+
+            fig,ax=plt.subplots(figsize=(10,4))
+            x=np.arange(len(venue_phase_stats))
+            width=0.35
+            ax.bar(x - width/2, venue_phase_stats["run_rate"], width,label=selected_venue, color="steelblue")
+            ax.bar(x + width/2, overall_phase_stats["run_rate"], width,label="Tournament Average", color="gray", alpha=0.7)
+
+            ax.set_xticks(x)
+            ax.set_xticklabels(venue_phase_stats["phase"])
+            ax.set_ylabel("Run Rate (runs per over)")
+            ax.set_title("Phase-wise Run Rate: This Venue vs Tournament Average")
+            ax.legend()
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
+            wickets_by_phase = venue_deliveries.groupby("phase")["any_wicket"].sum()
+            st.caption(f"Wickets per phase — Powerplay: {wickets_by_phase.get('Powerplay',0):.0f} | "f"Middle: {wickets_by_phase.get('Middle',0):.0f} | "f"Death: {wickets_by_phase.get('Death',0):.0f}")
+
+            
+        
+            st.divider()
+
+            #SECTION 4: FRANCHISE SUCCESS RATE:
+
+            st.subheader("🏆 Franchise Success Rate at this Venue")
+
+            venue_team_stats=[]
+            for team in get_all_teams(matches):
+                team_at_venue=venue_matches[(venue_matches["team1"]==team)|(venue_matches["team2"]==team)]
+
+                if len(team_at_venue)<3:
+                    continue
+
+                wins=(team_at_venue["winner"]==team).sum()
+                venue_team_stats.append({"Team":team,"Matches":len(team_at_venue),"Win Rate":wins/len(team_at_venue)*100})
+
+            venue_team_df=pd.DataFrame(venue_team_stats).sort_values("Win Rate")
+            if len(venue_team_df)>0:
+                fig,ax=plt.subplots(figsize=(10,max(3,len(venue_team_df)*0.35)))
+                colors = ["green" if w >= 50 else "crimson" for w in venue_team_df["Win Rate"]]
+                ax.barh(venue_team_df["Team"], venue_team_df["Win Rate"], color=colors, alpha=0.8)
+                ax.axvline(50, color="black", linestyle="--", alpha=0.5)
+                ax.set_xlabel("Win Rate (%)")
+                ax.set_title(f"Team Performance at {selected_venue} (min 3 matches)")
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close()
+            else:
+                st.info("Not enough team-level data for this venue")
+
+            st.divider()
 
 
+            # ---- SECTION 5: VENUE KINGS ----
 
+            st.subheader("👑 The Venue's Batting & Bowling Kings")
+            venue_batters=venue_deliveries[venue_deliveries["extras_type"]!="wides"].groupby("batter").agg(runs=("batsman_runs","sum"),balls=("batsman_runs","count")).reset_index()
+            venue_batters["strike_rate"]=venue_batters["runs"]/venue_batters["balls"]*100
+
+            venue_batters=venue_batters[venue_batters["balls"]>=20].sort_values("runs",ascending=False).head(5)
+
+            venue_deliveries_copy=venue_deliveries.copy()
+            venue_deliveries_copy["bowler_runs"]=venue_deliveries_copy["total_runs"]-venue_deliveries_copy["extra_runs"].where(venue_deliveries_copy["extras_type"].isin(["byes","legbyes"]),0)
+
+            venue_bowlers=venue_deliveries_copy.groupby("bowler").agg(wickets=("bowler_wicket","sum"),runs_conceded=("bowler_runs","sum"),balls_bowled=("extras_type",lambda x:(~x.isin(["wides","noballs"])).sum())).reset_index()
+            venue_bowlers["economy"]=(venue_bowlers["runs_conceded"]/(venue_bowlers["balls_bowled"]/6))
+
+            venue_bowlers=venue_bowlers[venue_bowlers["balls_bowled"]>=24].sort_values("wickets",ascending=False).head(5)
+
+            vk_col1,vk_col2=st.columns(2)
+            with vk_col1:
+                st.markdown(f"**🏏 Top Run Scorers at {selected_venue}**")
+                display_vb=venue_batters[["batter","runs","strike_rate"]].copy()
+                display_vb["strike_rate"] = display_vb["strike_rate"].round(1)
+                display_vb.columns = ["Player","Runs","Strike Rate"]
+                st.dataframe(display_vb.set_index("Player"), use_container_width=True)
+            
+            with vk_col2:
+                st.markdown(f"**🎳 Top Wicket Takers at {selected_venue}**")
+                display_vbo = venue_bowlers[["bowler","wickets","economy"]].copy()
+                display_vbo["economy"] = display_vbo["economy"].round(2)
+                display_vbo.columns = ["Player","Wickets","Economy"]
+                st.dataframe(display_vbo.set_index("Player"), use_container_width=True)
+
+    
+    # TAB 5: MATCH PREDICTOR
+    # ============================================================
+    with tab5:
+        st.title("🤖 Match Predictor")
+        st.markdown("*ML-powered win probability based on historical patterns*")
+
+        import pickle
+
+        with open("model.pkl","rb") as f:
+            saved=pickle.load(f)
+        
+        model=saved["model"]
+        le_team=saved["le_team1"]
+        le_venue = saved["le_venue"]
+        le_era = saved["le_era"]
+        feature_importance = saved["feature_importance"]
+        model_accuracy = saved["accuracy"]
+
+        st.info(f"📊 Model trained on {len(matches)} historical matches |"
+                f"Test Accuracy: **{model_accuracy:.1%}** "
+                f"(realistic for cricket — even pro models rarely exceed 65-70%)")
+        
+        st.divider()
+
+
+        #INPUT SECTION
+
+        st.subheader("Set Up the Match")
+
+        all_teams=get_all_teams(matches)
+        all_venues=get_all_venues(matches)
+
+        pcol1,pcol2=st.columns(2)
+        with pcol1:
+            pred_team1=st.selectbox("Team1",all_teams,index=all_teams.index("Chennai Super Kings"),key="pred_t1")
+        
+        with pcol2:
+            pred_team2_options=[t for t in all_teams if t!=pred_team1]
+            pred_team2=st.selectbox("Team2",pred_team2_options,index=pred_team2_options.index("Mumbai Indians") if "Mumbai Indians" in pred_team2_options else 0, key="pred_t2")
+
+
+        pred_venue=st.selectbox("Venue",all_venues,key="pred_venue")
+
+        pcol3,pcol4=st.columns(2)
+
+        with pcol3:
+            pred_toss_winner=st.radio("Who won the toss?",[pred_team1,pred_team2],key="pred_toss")
+
+        with pcol4:
+            pred_toss_decision=st.radio("Toss Decision",["bat","field"],key="pred_decision")
+
+
+        pred_era=st.radio("Era",["Impact Player Era (2023+)", "Traditional Era (Pre-2023)"],key="pred_era")
+
+        if st.button("🔮 Predict Outcome",type="primary"):
+            #Build feature vector
+
+            team1_enc = le_team.transform([pred_team1])[0]
+            team2_enc = le_team.transform([pred_team2])[0]
+            venue_enc = le_venue.transform([pred_venue])[0]
+            era_enc = le_era.transform([pred_era])[0]
+
+            toss_winner_is_team1 = 1 if pred_toss_winner == pred_team1 else 0
+
+            chose_bat = 1 if pred_toss_decision == "bat" else 0
+
+            # Compute live H2H and form using current full dataset
+
+            h2h_matches = matches[
+            ((matches["team1"]==pred_team1)&(matches["team2"]==pred_team2)) |
+            ((matches["team1"]==pred_team2)&(matches["team2"]==pred_team1))
+            ]
+
+            if len(h2h_matches) == 0:
+                h2h_winrate = 0.5
+            else:
+                t1_wins = (h2h_matches["winner"]==pred_team1).sum()
+                h2h_winrate = t1_wins / len(h2h_matches)
+
+            team1_recent = matches[(matches["team1"]==pred_team1)|(matches["team2"]==pred_team1)].sort_values("date").tail(5)
+            team1_form = (team1_recent["winner"]==pred_team1).sum() / len(team1_recent) if len(team1_recent) > 0 else 0.5
+
+
+            team2_recent = matches[(matches["team1"]==pred_team2)|(matches["team2"]==pred_team2)].sort_values("date").tail(5)
+            team2_form = (team2_recent["winner"]==pred_team2).sum() / len(team2_recent) if len(team2_recent) > 0 else 0.5
+
+
+            from data_loader import HOME_CITY_MAP
+            team1_is_home = 0
+            if pred_team1 in HOME_CITY_MAP:
+                keywords = HOME_CITY_MAP[pred_team1]
+                team1_is_home = int(any(k.lower() in pred_venue.lower() for k in keywords))
+
+            input_features = pd.DataFrame([{
+                "team1_enc": team1_enc,
+                "team2_enc": team2_enc,
+                "venue_enc": venue_enc,
+                "toss_winner_is_team1": toss_winner_is_team1,
+                "chose_bat": chose_bat,
+                "h2h_winrate": h2h_winrate,
+                "team1_form": team1_form,
+                "team2_form": team2_form,
+                "team1_is_home": team1_is_home,
+                "era_enc": era_enc
+            }])
+
+            probabilities = model.predict_proba(input_features)[0]
+            team1_prob = probabilities[1] * 100
+            team2_prob = probabilities[0] * 100
+
+            st.divider()
+            st.subheader("🎯 Prediction Result")
+
+            rcol1, rcol2 = st.columns(2)
+
+            with rcol1:
+                st.metric(pred_team1, f"{team1_prob:.1f}%")
+                st.progress(team1_prob/100)
+            with rcol2:
+                st.metric(pred_team2, f"{team2_prob:.1f}%")
+                st.progress(team2_prob/100)
+
+
+            if team1_prob > team2_prob:
+                st.success(f"🏆 **{pred_team1}** is favored to win this matchup")
+            else:
+                st.success(f"🏆 **{pred_team2}** is favored to win this matchup")
+            
+            st.divider()
+
+            # ---- KEY STATS THAT INFORMED THIS PREDICTION ----
+            st.subheader("📋 Key Stats Behind This Prediction")
+            kcol1, kcol2, kcol3, kcol4 = st.columns(4)
+            kcol1.metric("H2H Win Rate", f"{h2h_winrate*100:.0f}%",
+                        help=f"{pred_team1}'s historical win rate vs {pred_team2}")
+            kcol2.metric(f"{pred_team1} Form", f"{team1_form*100:.0f}%",
+                        help="Win rate in last 5 matches")
+            kcol3.metric(f"{pred_team2} Form", f"{team2_form*100:.0f}%",
+                        help="Win rate in last 5 matches")
+            kcol4.metric("Home Advantage", "Yes" if team1_is_home else "No",
+                        help=f"Is {pred_team1} playing at home?")
+            
+            st.divider()
+
+
+            # ---- FEATURE IMPORTANCE ----
+            st.subheader("🔍 What Drives This Model's Predictions?")
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.barh(feature_importance["Feature"], 
+                    feature_importance["Importance"],
+                    color="steelblue", alpha=0.8)
+            ax.set_xlabel("Importance Score")
+            ax.set_title("Feature Importance (across all training data)")
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
+            
+            st.caption("This model considers head-to-head history and venue most heavily, "
+                    "followed by team identity and recent form. Toss outcome has "
+                    "relatively minor influence — reflecting cricket's unpredictability.")
+
+
+    # TAB 6: IMPACT PLAYER ERA
+
+    with tab6:
+        st.title("🚀 Impact Player Era")
+        st.markdown("*How the 2023 Impact Player rule reshaped IPL strategy*")
+
+        st.info("The Impact Player rule, introduced in 2023, allows teams to substitute "
+            "a player based on match situation — effectively giving teams 12 players "
+            "and removing the traditional all-rounder constraint.")
+        
+        traditional=matches[matches["era"]=="Traditional Era (Pre-2023)"]
+        impact_era=matches[matches["era"]=="Impact Player Era (2023+)"]
+
+        traditional_ids = traditional["id"].tolist()
+        impact_ids = impact_era["id"].tolist()
+
+        traditional_deliveries = merged[merged["match_id"].isin(traditional_ids)]
+        impact_deliveries = merged[merged["match_id"].isin(impact_ids)]
+
+        st.divider()
+
+        #Section 1 :Scoring Bseline
+
+        st.subheader("📊 Scoring Baseline: Before vs After")
+
+        def get_avg_first_innings(deliveries_subset, match_ids_subset, matches_subset):
+            standard = matches_subset[
+            matches_subset["method"].isna() | (matches_subset["method"]=="")]
+            standard_ids = standard["id"].tolist()
+            first_inn = deliveries_subset[
+            (deliveries_subset["match_id"].isin(standard_ids)) &
+            (deliveries_subset["inning"]==1)
+        ]
+            return first_inn.groupby("match_id")["total_runs"].sum().mean()
+        
+        avg_trad = get_avg_first_innings(traditional_deliveries, traditional_ids, traditional)
+        avg_impact = get_avg_first_innings(impact_deliveries, impact_ids, impact_era)
+
+        c1, c2 = st.columns(2)
+        c1.metric("Avg 1st Innings (Pre-2023)", f"{avg_trad:.0f}")
+        c2.metric("Avg 1st Innings (2023+)", f"{avg_impact:.0f}", delta=f"{avg_impact-avg_trad:.0f} runs")
+
+        fig, ax = plt.subplots(figsize=(5,3.5))
+        ax.bar(["Pre-2023","2023+"], [avg_trad, avg_impact],
+           color=["gray","crimson"], alpha=0.8)
+        ax.set_ylabel("Average 1st Innings Score")
+        ax.set_title("Scoring Baseline Shift")
+        plt.tight_layout()
+        col1, col2 = st.columns([1,1])
+        with col1:
+            st.pyplot(fig)
+        plt.close()
+    
+        st.divider()
+
+        # ---- SECTION 2: CHASING EQUILIBRIUM ----
+
+        st.subheader("⚖️ Has the Chasing Advantage Changed?")
+
+        trad_bat_first_rate = traditional["batting_first_won"].mean() * 100
+        impact_bat_first_rate = impact_era["batting_first_won"].mean() * 100
+    
+        fig, ax = plt.subplots(figsize=(8,4))
+        x = np.arange(2)
+        width = 0.35
+        ax.bar(x - width/2, [trad_bat_first_rate, 100-trad_bat_first_rate], 
+           width, label="Pre-2023", color="gray", alpha=0.8)
+        ax.bar(x + width/2, [impact_bat_first_rate, 100-impact_bat_first_rate], 
+           width, label="2023+", color="crimson", alpha=0.8)
+        ax.set_xticks([0,1])
+        ax.set_xticklabels(["Batting First Win %","Chasing Win %"])
+        ax.set_ylabel("Win Rate (%)")
+        ax.set_title("Batting First vs Chasing — Era Comparison")
+        ax.legend()
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+        
+        st.divider()
+
+        # ---- SECTION 3: PHASE AGGRESSION ----
+        st.subheader("⚡ Phase Aggression Indicators")
+        
+        def phase_run_rate(deliveries_subset):
+            stats = deliveries_subset.groupby("phase").apply(
+                lambda x: pd.Series({
+                    "runs": x["total_runs"].sum(),
+                    "legal_balls": (~x["extras_type"].isin(["wides","noballs"])).sum(),
+                    "wickets": x["any_wicket"].sum(),
+                    "balls_total": len(x)
+                })
+            ).reset_index()
+            stats["run_rate"] = stats["runs"]/stats["legal_balls"]*6
+            stats["wicket_rate"] = stats["wickets"]/stats["balls_total"]*100
+            return stats
+        
+        trad_phase = phase_run_rate(traditional_deliveries)
+        impact_phase = phase_run_rate(impact_deliveries)
+        
+        fig, ax = plt.subplots(figsize=(10,4))
+        x = np.arange(len(trad_phase))
+        width = 0.35
+        ax.bar(x - width/2, trad_phase["run_rate"], width, 
+            label="Pre-2023", color="gray", alpha=0.8)
+        ax.bar(x + width/2, impact_phase["run_rate"], width,
+            label="2023+", color="crimson", alpha=0.8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(trad_phase["phase"])
+        ax.set_ylabel("Run Rate (runs/over)")
+        ax.set_title("Phase-wise Run Rate: Era Comparison")
+        ax.legend()
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+        
+        pwcol1, pwcol2 = st.columns(2)
+        pwcol1.markdown("**Pre-2023 Wicket Rate by Phase**")
+        pwcol1.dataframe(trad_phase[["phase","wicket_rate"]].rename(
+        columns={"wicket_rate":"Wickets per 100 balls"}).set_index("phase").round(2))
+        pwcol2.markdown("**2023+ Wicket Rate by Phase**")
+        pwcol2.dataframe(impact_phase[["phase","wicket_rate"]].rename(
+        columns={"wicket_rate":"Wickets per 100 balls"}).set_index("phase").round(2))
+        
+        st.divider()
+
+        # ---- SECTION 4: TOSS PHILOSOPHY FLIP ----
+        st.subheader("🪙 The Toss Philosophy Flip")
+        
+        trad_toss = traditional["toss_decision"].value_counts(normalize=True) * 100
+        impact_toss = impact_era["toss_decision"].value_counts(normalize=True) * 100
+        
+        toss_compare = pd.DataFrame({
+            "Pre-2023": trad_toss,
+            "2023+": impact_toss
+        }).fillna(0)
+        
+        fig, ax = plt.subplots(figsize=(8,4))
+        toss_compare.T.plot(kind="bar", stacked=True, ax=ax,
+                            color=["#2196F3","#FF9800"], alpha=0.85)
+        ax.set_ylabel("Percentage (%)")
+        ax.set_title("Toss Decision Preference: Era Comparison")
+        ax.tick_params(axis="x", rotation=0)
+        ax.legend(["Bat First","Field First"])
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+        
+        st.divider()
+
+        # ---- SECTION 5: OUTLIER SHOWCASE ----
+        st.subheader("🎆 The Outlier Showcase")
+        
+        def count_250_club(deliveries_subset, matches_subset):
+            standard = matches_subset[
+                matches_subset["method"].isna() | (matches_subset["method"]=="")]
+            standard_ids = standard["id"].tolist()
+            innings = deliveries_subset[
+                deliveries_subset["match_id"].isin(standard_ids)
+            ].groupby(["match_id","inning"])["total_runs"].sum()
+            return (innings >= 250).sum(), len(innings)
+        
+        trad_250, trad_total_inn = count_250_club(traditional_deliveries, traditional)
+        impact_250, impact_total_inn = count_250_club(impact_deliveries, impact_era)
+        
+        ocol1, ocol2 = st.columns(2)
+        ocol1.metric("250+ Scores (Pre-2023)", 
+                    f"{trad_250} times",
+                    help=f"Out of {trad_total_inn} innings ({trad_250/trad_total_inn*100:.2f}%)")
+        ocol2.metric("250+ Scores (2023+)", 
+                    f"{impact_250} times",
+                    help=f"Out of {impact_total_inn} innings ({impact_250/impact_total_inn*100:.2f}%)")
+        
+        avg_match_total_trad = traditional_deliveries.groupby("match_id")["total_runs"].sum().mean()
+        avg_match_total_impact = impact_deliveries.groupby("match_id")["total_runs"].sum().mean()
+        
+        ocol3, ocol4 = st.columns(2)
+        ocol3.metric("Avg Match Aggregate (Pre-2023)", f"{avg_match_total_trad:.0f}")
+        ocol4.metric("Avg Match Aggregate (2023+)", f"{avg_match_total_impact:.0f}",
+                    delta=f"{avg_match_total_impact-avg_match_total_trad:.0f}")
+        
+        st.success(f"🎯 **Bottom line:** The Impact Player rule has shifted IPL toward "
+                f"higher-scoring, more aggressive cricket — with first innings scores "
+                f"up by **{avg_impact-avg_trad:.0f} runs** on average since 2023.")

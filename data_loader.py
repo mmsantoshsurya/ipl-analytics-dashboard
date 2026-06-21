@@ -32,15 +32,33 @@ VENUE_CLEANING = {
     "Wankhede Stadium, Mumbai": "Wankhede Stadium",
     "MA Chidambaram Stadium, Chepauk": "MA Chidambaram Stadium",
     "MA Chidambaram Stadium, Chepauk, Chennai": "MA Chidambaram Stadium",
-    "M Chinnaswamy Stadium": "M Chinnaswamy Stadium",
+    "M Chinnaswamy Stadium, Bengaluru": "M Chinnaswamy Stadium",
+    "M.Chinnaswamy Stadium": "M Chinnaswamy Stadium",
     "Punjab Cricket Association Stadium, Mohali": "Punjab Cricket Association IS Bindra Stadium",
-    "Punjab Cricket Association IS Bindra Stadium, Mohali": "Punjab Cricket Association IS Bindra Stadium",
+    "Punjab Cricket Association IS Bindra Stadium, Mohali, Chandigarh": "Punjab Cricket Association IS Bindra Stadium",
     "Feroz Shah Kotla": "Arun Jaitley Stadium",
-    "Arun Jaitley Stadium, Delhi": "Arun Jaitley Stadium",
-    "Rajiv Gandhi International Stadium, Uppal": "Rajiv Gandhi International Stadium",
+    "Arun Jaitley Stadium, Delhi":"Arun Jaitley Stadium",
     "Eden Gardens, Kolkata": "Eden Gardens",
+    "Rajiv Gandhi International Stadium, Uppal": "Rajiv Gandhi International Stadium",
+    "Rajiv Gandhi International Stadium, Uppal, Hyderabad": "Rajiv Gandhi International Stadium",
+    "Sawai Mansingh Stadium, Jaipur": "Sawai Mansingh Stadium",
+    "Brabourne Stadium, Mumbai": "Brabourne Stadium",
+    "Dr DY Patil Sports Academy, Mumbai": "Dr DY Patil Sports Academy",
+    "Maharashtra Cricket Association Stadium, Pune": "Maharashtra Cricket Association Stadium",
+    "Himachal Pradesh Cricket Association Stadium, Dharamsala": "Himachal Pradesh Cricket Association Stadium",
+    "Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam": "Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium",
+    "Sardar Patel Stadium, Motera": "Narendra Modi Stadium, Ahmedabad",
+    "Subrata Roy Sahara Stadium": "Maharashtra Cricket Association Stadium",
+    "Punjab Cricket Association IS Bindra Stadium, Mohali": "Punjab Cricket Association IS Bindra Stadium",
+    "Zayed Cricket Stadium, Abu Dhabi": "Sheikh Zayed Stadium",
+    "Saurashtra Cricket Association Stadium": "Niranjan Shah Stadium", 
+    "OUTsurance Oval": "Mangaung Oval",
+    "Barsapara Cricket Stadium, Guwahati": "Barsapara Cricket Stadium",
+    "Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium, Lucknow": "Ekana Cricket Stadium",
+    "Vidarbha Cricket Association Stadium, Jamtha": "Vidarbha Cricket Association Stadium",
+    "Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur": "Maharaja Yadavindra Singh International Cricket Stadium",
+    "Dubai International Cricket Stadium": "Dubai International Cricket Stadium"
 }
-
 BOWLER_WICKET_TYPES = [
     "caught", "bowled", "lbw", "stumped",
     "caught and bowled", "hit wicket"
@@ -103,6 +121,8 @@ def load_matches():
     super_over = (df_valid["super_over"] == "Y")
     df_valid["nail_biter"] = (close_runs | close_wickets | super_over).astype(int)
 
+    df_valid["team1_won"] = (df_valid["winner"] == df_valid["team1"]).astype(int)
+
     
     
     return df_valid
@@ -134,6 +154,7 @@ def load_deliveries():
     df["is_six"] = (df["batsman_runs"] == 6).astype(int)
     df["is_four"] = (df["batsman_runs"] == 4).astype(int)
     df["bowler_runs"] = df["total_runs"] - df["extra_runs"].where(df["extras_type"].isin(["byes","legbyes"]), 0)
+    df["any_wicket"] = df["is_wicket"]
     
     return df
 

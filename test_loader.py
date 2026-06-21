@@ -19,3 +19,7 @@ print("Bowler wickets:", deliveries["bowler_wicket"].sum())
 print("\nTop 5 scorers:", 
     deliveries.groupby("batter")["batsman_runs"]
     .sum().sort_values(ascending=False).head())
+venues = sorted(matches["venue"].unique())
+for v in venues:
+    print(v)
+    
