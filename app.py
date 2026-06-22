@@ -599,7 +599,8 @@ with tab1:
             fig,ax=plt.subplots(figsize=(10,4))
             first_innings = innings_scores[innings_scores["inning"]==1]["total_runs"]
             second_innings = innings_scores[innings_scores["inning"]==2]["total_runs"]
-            bp=ax.boxplot([first_innings, second_innings], vert=False, patch_artist=True,labels=["1st Innings", "2nd Innings"])
+            bp = ax.boxplot([first_innings, second_innings], vert=False, patch_artist=True)
+            ax.set_yticklabels(["1st Innings", "2nd Innings"])
             colors = ["steelblue", "orange"]
             for patch, color in zip(bp['boxes'], colors):
                 patch.set_facecolor(color)
