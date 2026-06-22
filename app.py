@@ -24,7 +24,7 @@ tab1,tab2,tab3,tab4,tab5,tab6=st.tabs(["📊 IPL Overview","🏏 Team Intelligen
 
 with tab1:
     st.title("📊 IPL Macro-Overview")
-    st.markdown("*16 seasons of data • 2008-2024 • 1090 macthes*")
+    st.markdown("*16 seasons of data • 2008-2024 • 1090 matches*")
 
     #SECTION1: KPI CARDS:
 
@@ -49,7 +49,7 @@ with tab1:
     #Matches per season
     seasons=matches_per_season.index.to_list()
     ax1.bar(seasons,matches_per_season.values,color="steelblue",alpha=0.8)
-    ax1.set_title("Matches_per_Season")
+    ax1.set_title("Matches per Season")
     ax1.set_xlabel("Season")
     ax1.set_ylabel("Number of Matches")
     ax1.tick_params(axis="x",rotation=45)
@@ -99,7 +99,7 @@ with tab1:
     #SECTION 4: Batting First Win Rate:
 
     st.subheader("Batting First vs Chasing - Win Rate Over Seasons")
-    dls_toggle=st.checkbox("Exclude DLS (Rain-Affected) Macthes", value=False)
+    dls_toggle=st.checkbox("Exclude DLS (Rain-Affected) Matches", value=False)
 
     if dls_toggle:
         analysis_df=matches[matches["method"].isna()|(matches["method"]=="")].copy()

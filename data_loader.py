@@ -13,20 +13,25 @@ TEAM_CLEANING = {
     "Deccan Chargers": "Sunrisers Hyderabad",
     "Rising Pune Supergiant": "Rising Pune Supergiants",
     "Rising Pune Supergiants": "Rising Pune Supergiants",
-    "Pune Warriors": "Pune Warriors",
+    
 }
 
 HOME_CITY_MAP = {
-    "Mumbai Indians": ["Mumbai", "Wankhede"],
+    "Mumbai Indians": ["Mumbai", "Wankhede","Brabourne","Patil"],
     "Kolkata Knight Riders": ["Kolkata", "Eden Gardens"],
     "Chennai Super Kings": ["Chennai", "Chepauk", "Chidambaram"],
-    "Rajasthan Royals": ["Jaipur", "Sawai"],
+    "Rajasthan Royals": ["Jaipur", "Sawai","Barsapara"],
     "Royal Challengers Bengaluru": ["Bengaluru", "Bangalore", "Chinnaswamy"],
     "Sunrisers Hyderabad": ["Hyderabad", "Uppal", "Rajiv Gandhi"],
-    "Delhi Capitals": ["Delhi", "Kotla", "Feroz Shah"],
-    "Punjab Kings": ["Mohali", "Punjab", "PCA"],
+    "Delhi Capitals": ["Delhi", "Kotla", "Feroz Shah","Arun","ACA-VDCA"],
+    "Punjab Kings": ["Mohali", "Punjab", "PCA","Bindra","Maharaja","Himachal"],
     "Gujarat Titans": ["Ahmedabad", "Narendra Modi"],
     "Lucknow Super Giants": ["Lucknow", "Ekana"],
+    "Rising Pune Supergiants":["Maharashtra"],
+    "Pune Warriors":["Maharashtra"],
+    "Gujarat Lions":["Niranjan"]
+    
+
 }
 VENUE_CLEANING = {
     "Wankhede Stadium, Mumbai": "Wankhede Stadium",
